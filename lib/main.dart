@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'constants/app_colors.dart';
 import 'models/activity_model.dart';
 import 'widgets/activity_card.dart';
+import 'screens/add_activity_screen.dart';
+import 'services/storage_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -25,55 +27,94 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Data aktivitas sesuai desain
-    final activities = [
-      ActivityModel(
-        title: 'Potong Rambut',
-        lastDate: '12 Mar 2025',
-        daysAgo: '18 hari yang lalu',
-        iconColor: AppColors.haircut,
-        icon: Icons.cut,
-        status: 'Selesai',
-      ),
-      ActivityModel(
-        title: 'Ganti Oli Motor',
-        lastDate: '1 Feb 2025',
-        daysAgo: '57 hari yang lalu',
-        iconColor: AppColors.motor,
-        icon: Icons.build,
-        status: 'Selesai',
-      ),
-      ActivityModel(
-        title: 'Bersihkan Kamar',
-        lastDate: '25 Mar 2025',
-        daysAgo: '5 hari yang lalu',
-        iconColor: AppColors.cleaning,
-        icon: Icons.cleaning_services,
-        status: 'Selesai',
-      ),
-      ActivityModel(
-        title: 'Cuci Baju',
-        lastDate: '28 Mar 2025',
-        daysAgo: '2 hari yang lalu',
-        iconColor: AppColors.laundry,
-        icon: Icons.local_laundry_service,
-        status: 'Selesai',
-      ),
-      ActivityModel(
-        title: 'Bayar Tagihan',
-        lastDate: 'Belum pernah dilakukan',
-        daysAgo: 'Belum dicatat',
-        iconColor: AppColors.bill,
-        icon: Icons.payments,
-        status: 'Selesai',
-      ),
-    ];
+  State<HomeScreen> createState() => _HomeScreenState();
+}
 
+class _HomeScreenState extends State<HomeScreen> {
+  List<ActivityModel> activities = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActivitiesFromStorage();
+  }
+
+  Future<void> _loadActivitiesFromStorage() async {
+    final loadedActivities = await StorageService.loadActivities();
+    
+    if (mounted) {
+      setState(() {
+        // ✅ FIX: Tidak ada data dummy — jika kosong, tampilkan empty state
+        activities = loadedActivities;
+      });
+    }
+  }
+
+  // ✅ FIX: Hanya reload data dari storage, JANGAN simpan lagi (sudah disimpan di AddActivityScreen)
+  Future<void> _addNewActivity(Map<String, dynamic> newData) async {
+    // Reload data dari storage (karena sudah disimpan di AddActivityScreen)
+    final updatedActivities = await StorageService.loadActivities();
+    
+    if (mounted) {
+      setState(() {
+        activities = updatedActivities;
+      });
+    }
+  }
+
+  // Helper: Mapping emoji ke warna
+  Color _getEmojiColor(String? emoji) {
+    switch (emoji) {
+      case '✂️': return AppColors.haircut;
+      case '🔧': return AppColors.motor;
+      case '🧹': return AppColors.cleaning;
+      case '🏃': return AppColors.laundry;
+      case '💊': return AppColors.bill;
+      case '📚': return AppColors.haircut;
+      case '🚿': return AppColors.laundry;
+      case '💳': return AppColors.bill;
+      case '🌿': return AppColors.cleaning;
+      case '🐾': return AppColors.motor;
+      case '🚗': return AppColors.motor;
+      case '🎯': return AppColors.bill;
+      default: return AppColors.haircut;
+    }
+  }
+
+  // Helper: Mapping emoji ke IconData
+  IconData _getEmojiIcon(String? emoji) {
+    switch (emoji) {
+      case '✂️': return Icons.cut;
+      case '🔧': return Icons.build;
+      case '🧹': return Icons.cleaning_services;
+      case '🏃': return Icons.directions_run;
+      case '💊': return Icons.medication;
+      case '📚': return Icons.school;
+      case '🚿': return Icons.shower;
+      case '💳': return Icons.payments;
+      case '🌿': return Icons.eco;
+      case '🐾': return Icons.pets;
+      case '🚗': return Icons.directions_car;
+      case '🎯': return Icons.flag;
+      default: return Icons.star;
+    }
+  }
+
+  // Helper: Nama bulan
+  String _getMonthName(int month) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+    ];
+    return months[month - 1];
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -113,31 +154,57 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.add,
-                      color: Colors.white,
-                      size: 20,
+                  
+                  GestureDetector(
+                    onTap: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AddActivityScreen(),
+                        ),
+                      );
+
+                      if (result != null && result is Map<String, dynamic>) {
+                        _addNewActivity(result);
+                      }
+                    },
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.add,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
 
-              // List Activities
+              // ✅ FIX: Empty state jika belum ada aktivitas
               Expanded(
-                child: ListView.builder(
-                  itemCount: activities.length,
-                  itemBuilder: (context, index) {
-                    return ActivityCard(activity: activities[index]);
-                  },
-                ),
+                child: activities.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Belum ada aktivitas.\nKlik + untuk menambah.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 14,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: activities.length,
+                        itemBuilder: (context, index) {
+                          return ActivityCard(activity: activities[index]);
+                        },
+                      ),
               ),
             ],
           ),
